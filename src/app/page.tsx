@@ -5,20 +5,16 @@ import Content from "./components/Content_mainpage"
 export default function Home() {
   return (
     <>
-    <div className="main">
+    
       <div className="relative z-10">
         <Main/>
       </div>
 
-      
 
-      
-    </div>
-      <div className="Content">
-        <div className="relative z-0">
+        <div className="relative ">
           <Content/>
         </div>
-        </div>
+        
         
         
     </>
