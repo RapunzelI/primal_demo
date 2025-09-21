@@ -205,6 +205,12 @@ export default function Navbar() {
                       }`}
                     ></span>
                   </Link>
+                  <Link
+                  href="/signin"
+                  className="rounded-full bg-white text-[#373995] px-4 py-2 font-semibold hover:brightness-95 transition"
+                  >
+                  เข้าสู่ระบบ
+                </Link>
                 </div>
               </div>
             </div>
@@ -333,6 +339,10 @@ function MobileNav({ closeSideMenu }: MobileNavProps) {
             >
               <AiOutlineDeploymentUnit className="text-black" />
               <span>รายงานพัฒนา</span>
+            </Link>
+            <Link className="navbar_link relative flex flex-row items-center space-x-2" href="/signin" onClick={closeSideMenu}>
+              <AiOutlineDeploymentUnit />
+              <span>เข้าสู่ระบบ</span>
             </Link>
           </div>
         </div>
