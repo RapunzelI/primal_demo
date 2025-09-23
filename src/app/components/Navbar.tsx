@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase"; // ปรับ path ให้ถูกต้อง
 
 // icons
 import { IoMenu } from "react-icons/io5";
@@ -14,14 +16,20 @@ import { TbLayoutDashboard } from "react-icons/tb";
 import { FaArrowUp } from "react-icons/fa6";
 import { IoIosArrowDown } from "react-icons/io";
 import { IoPerson } from "react-icons/io5";
-import LogoutButton from "./components/LogoutButton";
+import LogoutButton from "./LogoutButton";
 
 export default function Navbar() {
   const [isSideMenuOpen, setSideMenu] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const [isProfileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [dropdownTimeout, setDropdownTimeout] = useState(null);
+  const [profileDropdownTimeout, setProfileDropdownTimeout] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [userDisplayName, setUserDisplayName] = useState("");
+  const [userPhotoURL, setUserPhotoURL] = useState("");
   const pathname = usePathname();
 
   const openSideMenu = () => setSideMenu(true);
@@ -31,6 +39,64 @@ export default function Navbar() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // ตรวจสอบสถานะการเข้าสู่ระบบจาก Firebase Auth
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        setUserEmail(user.email || "");
+        setUserDisplayName(user.displayName || "");
+        setUserPhotoURL(user.photoURL || "");
+        
+        // เก็บข้อมูลใน localStorage (สำรอง)
+        localStorage.setItem('authToken', user.refreshToken);
+        localStorage.setItem('userEmail', user.email || '');
+        localStorage.setItem('userDisplayName', user.displayName || '');
+        localStorage.setItem('userPhotoURL', user.photoURL || '');
+        localStorage.setItem('userId', user.uid);
+      } else {
+        setIsLoggedIn(false);
+        setUserEmail("");
+        setUserDisplayName("");
+        setUserPhotoURL("");
+        
+        // ล้างข้อมูลใน localStorage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userDisplayName');
+        localStorage.removeItem('userPhotoURL');
+        localStorage.removeItem('userId');
+      }
+    });
+
+    // Cleanup function
+    return () => unsubscribe();
+  }, []);
+
+  // ตรวจสอบ event จาก signin page
+  useEffect(() => {
+    const handleAuthStateChanged = () => {
+      // รีเฟรชข้อมูลเมื่อมีการเปลี่ยนแปลงสถานะ
+      const email = localStorage.getItem('userEmail');
+      const displayName = localStorage.getItem('userDisplayName');
+      const photoURL = localStorage.getItem('userPhotoURL');
+      const token = localStorage.getItem('authToken');
+      
+      if (token && email) {
+        setIsLoggedIn(true);
+        setUserEmail(email);
+        setUserDisplayName(displayName || "");
+        setUserPhotoURL(photoURL || "");
+      }
+    };
+
+    window.addEventListener('authStateChanged', handleAuthStateChanged);
+    
+    return () => {
+      window.removeEventListener('authStateChanged', handleAuthStateChanged);
+    };
+  }, []);
+
   // ตรวจสอบว่าเป็น touch device หรือไม่
   useEffect(() => {
     const checkTouchDevice = () => {
@@ -39,8 +105,9 @@ export default function Navbar() {
     checkTouchDevice();
   }, []);
 
+  // Handle สื่อการสอน dropdown
   const handleMouseEnter = () => {
-    if (isTouchDevice) return; // ไม่ทำงานใน touch device
+    if (isTouchDevice) return;
     if (dropdownTimeout) {
       clearTimeout(dropdownTimeout);
       setDropdownTimeout(null);
@@ -49,7 +116,7 @@ export default function Navbar() {
   };
 
   const handleMouseLeave = () => {
-    if (isTouchDevice) return; // ไม่ทำงานใน touch device
+    if (isTouchDevice) return;
     const timeout = setTimeout(() => {
       setDropdownOpen(false);
     }, 200);
@@ -63,13 +130,40 @@ export default function Navbar() {
     }
   };
 
+  // Handle Profile dropdown
+  const handleProfileMouseEnter = () => {
+    if (isTouchDevice) return;
+    if (profileDropdownTimeout) {
+      clearTimeout(profileDropdownTimeout);
+      setProfileDropdownTimeout(null);
+    }
+    setProfileDropdownOpen(true);
+  };
+
+  const handleProfileMouseLeave = () => {
+    if (isTouchDevice) return;
+    const timeout = setTimeout(() => {
+      setProfileDropdownOpen(false);
+    }, 200);
+    setProfileDropdownTimeout(timeout);
+  };
+
+  const handleProfileDropdownClick = (e) => {
+    e.preventDefault();
+    if (isTouchDevice) {
+      setProfileDropdownOpen(!isProfileDropdownOpen);
+    }
+  };
+
   // ปิด dropdown เมื่อคลิกที่อื่น
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (isTouchDevice && isDropdownOpen) {
+      if (isTouchDevice && (isDropdownOpen || isProfileDropdownOpen)) {
         const dropdown = event.target.closest('.dropdown-container');
-        if (!dropdown) {
+        const profileDropdown = event.target.closest('.profile-dropdown-container');
+        if (!dropdown && !profileDropdown) {
           setDropdownOpen(false);
+          setProfileDropdownOpen(false);
         }
       }
     };
@@ -81,7 +175,7 @@ export default function Navbar() {
       document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [isTouchDevice, isDropdownOpen]);
+  }, [isTouchDevice, isDropdownOpen, isProfileDropdownOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -98,8 +192,22 @@ export default function Navbar() {
       if (dropdownTimeout) {
         clearTimeout(dropdownTimeout);
       }
+      if (profileDropdownTimeout) {
+        clearTimeout(profileDropdownTimeout);
+      }
     };
-  }, [dropdownTimeout]);
+  }, [dropdownTimeout, profileDropdownTimeout]);
+
+  // สร้าง initials จากชื่อหรือ email
+  const getInitials = (name: string, email: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (email) {
+      return email.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
 
   return (
     <>
@@ -109,9 +217,8 @@ export default function Navbar() {
         <nav
           className="h-24 md:p-2.5 sm:p-4 md:flex md:justify-between md:items-center bg-[#373995] relative z-10"
           suppressHydrationWarning
-
         >
-          {isSideMenuOpen && <MobileNav closeSideMenu={closeSideMenu} />}
+          {isSideMenuOpen && <MobileNav closeSideMenu={closeSideMenu} isLoggedIn={isLoggedIn} userEmail={userEmail} userDisplayName={userDisplayName} userPhotoURL={userPhotoURL} />}
           <div className="container mx-auto flex justify-between items-center h-full px-4 md:px-0">
             {/* Logo - เพิ่ม margin และ padding สำหรับมือถือ */}
             <Link href="/" className="logo xl:mr-auto xl:ml-10 flex items-center">
@@ -157,7 +264,6 @@ export default function Navbar() {
                           className="block px-4 py-3 text-white hover:text-black hover:bg-white/60 hover:bg-opacity-20 transition-colors border-b border-gray-600 text-center"
                         >
                           <div className="flex items-center justify-center gap-2">
-                            
                             เนื้อหา
                           </div>
                         </Link>
@@ -166,7 +272,6 @@ export default function Navbar() {
                           className="block px-4 py-3 text-white hover:text-black hover:bg-white/60 hover:bg-opacity-20 transition-colors text-center"
                         >
                           <div className="flex items-center justify-center gap-2">
-                            
                             เกม
                           </div>
                         </Link>
@@ -184,7 +289,7 @@ export default function Navbar() {
                   >
                     ลงทะเบียนนักเรียน
                     <span 
-                      className={`absolute bottom-2 left-0 h-0.5 bg-white transition-all duration-300 ${
+                      className={`absolute bottom-0 left-0 h-0.5 bg-white transition-all duration-300 ${
                         pathname === '/account' 
                           ? 'w-full' 
                           : 'w-0 group-hover:w-full'
@@ -201,20 +306,84 @@ export default function Navbar() {
                   >
                     รายงานพัฒนา
                     <span 
-                      className={`absolute bottom-2 left-0 h-0.5 bg-white transition-all duration-300 ${
+                      className={`absolute bottom-0 left-0 h-0.5 bg-white transition-all duration-300 ${
                         pathname === '/dashboard' 
                           ? 'w-full' 
                           : 'w-0 group-hover:w-full'
                       }`}
                     ></span>
                   </Link>
-                  <Link
-                  href="/signin"
-                  className="rounded-lg bg-white text-[#373995] px-4 py-2 font-semibold hover:brightness-95 transition"
-                  >
-                  เข้าสู่ระบบ
-                </Link>
-                <LogoutButton/>
+                  
+                  {/* Profile Section - แสดงตามสถานะการเข้าสู่ระบบ */}
+                  {isLoggedIn ? (
+                    <div 
+                      className="relative profile-dropdown-container"
+                      onMouseEnter={handleProfileMouseEnter}
+                      onMouseLeave={handleProfileMouseLeave}
+                    >
+                      <button 
+                        className="flex items-center gap-2 hover:text-gray-200 transition-colors"
+                        onClick={handleProfileDropdownClick}
+                      >
+                        {/* Profile Image */}
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex items-center justify-center">
+                          {userPhotoURL ? (
+                            <Image 
+                              src={userPhotoURL} 
+                              alt="Profile" 
+                              width={32} 
+                              height={32}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-[#373995] text-sm font-semibold">
+                              {getInitials(userDisplayName, userEmail)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm max-w-32 truncate">
+                          {userDisplayName || userEmail}
+                        </span>
+                        <IoIosArrowDown 
+                          className={`transition-transform duration-200 ${
+                            isProfileDropdownOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                      
+                      {/* Profile Dropdown Menu */}
+                      {isProfileDropdownOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-48 bg-black/60 bg-opacity-80 rounded-lg shadow-lg overflow-hidden z-50">
+                          <div className="px-4 py-3 border-b border-gray-600">
+                            <div className="text-white text-sm font-medium truncate">{userDisplayName || 'ผู้ใช้'}</div>
+                            <div className="text-gray-300 text-xs truncate">{userEmail}</div>
+                          </div>
+                          <Link
+                            href="/profile"
+                            className="block px-4 py-3 text-white hover:text-black hover:bg-white/60 hover:bg-opacity-20 transition-colors"
+                          >
+                            โปรไฟล์
+                          </Link>
+                          <Link
+                            href="/settings"
+                            className="block px-4 py-3 text-white hover:text-black hover:bg-white/60 hover:bg-opacity-20 transition-colors border-b border-gray-600"
+                          >
+                            ตั้งค่า
+                          </Link>
+                          <div className="px-4 py-3">
+                            <LogoutButton />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Link
+                      href="/signin"
+                      className="rounded-lg bg-white text-[#373995] px-4 py-2 font-semibold hover:brightness-95 transition"
+                    >
+                      เข้าสู่ระบบ
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -263,10 +432,25 @@ export default function Navbar() {
 
 interface MobileNavProps {
   closeSideMenu: () => void;
+  isLoggedIn: boolean;
+  userEmail: string;
+  userDisplayName: string;
+  userPhotoURL: string;
 }
 
-function MobileNav({ closeSideMenu }: MobileNavProps) {
+function MobileNav({ closeSideMenu, isLoggedIn, userEmail, userDisplayName, userPhotoURL }: MobileNavProps) {
   const [isLearningExpanded, setLearningExpanded] = useState(false);
+
+  // สร้าง initials จากชื่อหรือ email
+  const getInitials = (name: string, email: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (email) {
+      return email.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
 
   return (
     <div className="fixed left-0 top-0 z-[10000] flex h-full min-h-screen w-full justify-end bg-black/60 md:hidden">
@@ -278,6 +462,31 @@ function MobileNav({ closeSideMenu }: MobileNavProps) {
           />
         </div>
         <div className="flex flex-col gap-6 mt-6">
+          {/* Profile Section สำหรับ Mobile */}
+          {isLoggedIn && (
+            <div className="flex items-center gap-3 ml-[15px] pb-4 border-b border-gray-200">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-[#373995] flex items-center justify-center">
+                {userPhotoURL ? (
+                  <Image 
+                    src={userPhotoURL} 
+                    alt="Profile" 
+                    width={40} 
+                    height={40}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white text-sm font-semibold">
+                    {getInitials(userDisplayName, userEmail)}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900">{userDisplayName || 'ผู้ใช้'}</span>
+                <span className="text-xs text-gray-600 truncate max-w-32">{userEmail}</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-4 ml-[15px]">
             <Link
               className="navbar_link relative flex flex-row items-center space-x-2 text-black"
@@ -313,7 +522,6 @@ function MobileNav({ closeSideMenu }: MobileNavProps) {
                     href="/learning/content"
                     onClick={closeSideMenu}
                   >
-                    
                     <span>เนื้อหา</span>
                   </Link>
                   <Link
@@ -321,7 +529,6 @@ function MobileNav({ closeSideMenu }: MobileNavProps) {
                     href="/learning/games"
                     onClick={closeSideMenu}
                   >
-                    
                     <span>เกม</span>
                   </Link>
                 </div>
@@ -344,14 +551,40 @@ function MobileNav({ closeSideMenu }: MobileNavProps) {
               <AiOutlineDeploymentUnit className="text-black" />
               <span>รายงานพัฒนา</span>
             </Link>
-            <Link 
-              className="navbar_link relative flex flex-row items-center justify-center space-x-2 bg-[#373995] text-white rounded-xl px-4 py-3" 
-              href="/signin" 
-              onClick={closeSideMenu}
-            >               
-              <IoPerson />               
-              <span>เข้าสู่ระบบ</span>             
-            </Link>
+
+            {/* Profile Links สำหรับ Mobile */}
+            {isLoggedIn ? (
+              <>
+                <Link
+                  className="navbar_link relative flex flex-row items-center space-x-2 text-black"
+                  href="/profile"
+                  onClick={closeSideMenu}
+                >
+                  <IoPerson className="text-black" />
+                  <span>โปรไฟล์</span>
+                </Link>
+                <Link
+                  className="navbar_link relative flex flex-row items-center space-x-2 text-black"
+                  href="/settings"
+                  onClick={closeSideMenu}
+                >
+                  <IoPerson className="text-black" />
+                  <span>ตั้งค่า</span>
+                </Link>
+                <div className="pt-2">
+                  <LogoutButton />
+                </div>
+              </>
+            ) : (
+              <Link 
+                className="navbar_link relative flex flex-row items-center justify-center space-x-2 bg-[#373995] text-white rounded-xl px-4 py-3" 
+                href="/signin" 
+                onClick={closeSideMenu}
+              >               
+                <IoPerson />               
+                <span>เข้าสู่ระบบ</span>             
+              </Link>
+            )}
           </div>
         </div>
       </div>
