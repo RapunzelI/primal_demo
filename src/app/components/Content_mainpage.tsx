@@ -3,9 +3,16 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { IoSearch } from "react-icons/io5";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Main() {
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
+
+  // Function to handle profile click
+  const handleProfileClick = (card: any) => {
+    router.push('/profile');
+  };
 
   // Sample data for cards
   const cardData = [
@@ -149,7 +156,7 @@ export default function Main() {
           {cardData.map((card) => (
             <motion.div
               key={card.id}
-              className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+              className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
               whileHover={{ y: -5 }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -174,12 +181,16 @@ export default function Main() {
                     alt={`Profile ${card.id}`}
                     width={40}
                     height={40}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 hover:border-[#373995] transition-colors cursor-pointer"
+                    onClick={() => handleProfileClick(card)}
                   />
                 </div>
                 <div className="flex-grow">
                   <p className="text-xs text-gray-500 mb-1">{card.description}</p>
-                  <h3 className="text-xs font-medium text-gray-800 truncate">
+                  <h3 
+                    className="text-xs font-medium text-gray-800 truncate hover:text-[#373995] transition-colors cursor-pointer"
+                    onClick={() => handleProfileClick(card)}
+                  >
                     {card.name}
                   </h3>
                 </div>

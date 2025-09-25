@@ -1,16 +1,15 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import { BsFileEarmarkExcel } from "react-icons/bs";
-import { Search, Plus, Edit2, Trash2 } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, X } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 interface Student {
   id: number;
+  prefix: string;
   firstName: string;
   lastName: string;
-  nickname: string;
-  grade: string;
-  section: string;
+  gradeYear: string;
   avatar?: string;
 }
 
@@ -28,14 +27,25 @@ const StudentManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [newStudent, setNewStudent] = useState({
+    prefix: "",
     firstName: "",
     lastName: "",
-    nickname: "",
-    grade: "",
-    section: "",
+    gradeYear: "",
     avatar: ""
   });
+
+  const prefixOptions = [
+    "เด็กชาย",
+    "เด็กหญิง"
+  ];
+
+  const gradeYearOptions = [
+    "อนุบาล 1",
+    "อนุบาล 2", 
+    "อนุบาล 3"
+  ];
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -67,11 +77,10 @@ const StudentManagement: React.FC = () => {
         
         const studentsData = jsonData.map((row: any, index) => ({
           id: index + 1,
+          prefix: row['คำนำหน้า'] || row['prefix'] || '',
           firstName: row['ชื่อ'] || row['firstName'] || '',
           lastName: row['นามสกุล'] || row['lastName'] || '',
-          nickname: row['ชื่อเล่น'] || row['nickname'] || '',
-          grade: row['ชั้น'] || row['grade'] || '',
-          section: row['ห้อง'] || row['section'] || '',
+          gradeYear: row['ชั้นปี'] || row['gradeYear'] || '',
           avatar: row['รูปภาพ'] || row['avatar'] || row['รูป'] || ''
         }));
         
@@ -130,11 +139,10 @@ const StudentManagement: React.FC = () => {
   };
 
   const filteredStudents = students.filter(student =>
+    student.prefix.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.section.toLowerCase().includes(searchTerm.toLowerCase())
+    student.gradeYear.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleAddStudent = () => {
@@ -144,7 +152,7 @@ const StudentManagement: React.FC = () => {
         ...newStudent
       };
       setStudents([...students, student]);
-      setNewStudent({ firstName: "", lastName: "", nickname: "", grade: "", section: "", avatar: "" });
+      setNewStudent({ prefix: "", firstName: "", lastName: "", gradeYear: "", avatar: "" });
       setIsAddingStudent(false);
     }
   };
@@ -152,11 +160,10 @@ const StudentManagement: React.FC = () => {
   const handleEditStudent = (student: Student) => {
     setEditingStudent(student);
     setNewStudent({
+      prefix: student.prefix,
       firstName: student.firstName,
       lastName: student.lastName,
-      nickname: student.nickname,
-      grade: student.grade,
-      section: student.section,
+      gradeYear: student.gradeYear,
       avatar: student.avatar || ""
     });
   };
@@ -169,7 +176,7 @@ const StudentManagement: React.FC = () => {
           : s
       ));
       setEditingStudent(null);
-      setNewStudent({ firstName: "", lastName: "", nickname: "", grade: "", section: "", avatar: "" });
+      setNewStudent({ prefix: "", firstName: "", lastName: "", gradeYear: "", avatar: "" });
     }
   };
 
@@ -180,28 +187,54 @@ const StudentManagement: React.FC = () => {
   };
 
   const convertGoogleDriveUrl = (url: string) => {
-  // ตรวจสอบว่าเป็น Google Drive URL หรือไม่
-  if (url.includes('drive.google.com')) {
-    // ดึง file ID จาก URL
-    const match = url.match(/[-\w]{25,}/);
-    if (match) {
-      const fileId = match[0];
-      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
+    if (url.includes('drive.google.com')) {
+      const match = url.match(/[-\w]{25,}/);
+      if (match) {
+        const fileId = match[0];
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
+      }
     }
-  }
-  return url; // คืนค่า URL เดิมถ้าไม่ใช่ Google Drive
-};
+    return url;
+  };
+
+  const handleImageClick = (imageUrl: string) => {
+    setSelectedImage(convertGoogleDriveUrl(imageUrl));
+  };
+
+  const closeImageModal = () => {
+    setSelectedImage(null);
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-[#E8E8E8]">
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={closeImageModal}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="รูปภาพขนาดใหญ่"
+              className="max-w-full max-h-screen object-contain rounded-lg"
+              onClick={closeImageModal}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6 md:p-8 mb-4 mt-20">
+      <div className="w-full max-w-6xl bg-white rounded-lg shadow-lg p-6 md:p-8 mb-4 mt-20">
         <h1 className="text-2xl font-semibold text-[#373995] mb-2">ระบบจัดการนักเรียน</h1>
         <p className="text-gray-600">Student Management System</p>
       </div>
 
       {/* Upload Section */}
-      <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6 md:p-8 mb-4">
+      <div className="w-full max-w-6xl bg-white rounded-lg shadow-lg p-6 md:p-8 mb-4">
         <h2 className="text-xl font-semibold mb-2 text-[#373995]">เพิ่มข้อมูลนักเรียน</h2>
         <div className="w-full h-px bg-[#373995] mb-6"></div>
         
@@ -222,6 +255,9 @@ const StudentManagement: React.FC = () => {
             <div>
               <p className="text-black mb-2">กรุณาเลือกไฟล์ Excel ที่ต้องการอัปโหลด</p>
               <p className="text-sm text-black opacity-70">รองรับไฟล์ .xlsx และ .xls เท่านั้น</p>
+              <p className="text-xs text-gray-500 mt-2">
+                คอลัมน์ที่ต้องมี: คำนำหน้า, ชื่อ, นามสกุล, ชั้นปี (อนุบาล 1, อนุบาล 2, อนุบาล 3, ป.1-ป.6, ม.1-ม.6), รูปภาพ (ไม่บังคับ)
+              </p>
             </div>
             <input
               type="file"
@@ -242,7 +278,7 @@ const StudentManagement: React.FC = () => {
 
       {/* Student Data Table */}
       {students.length > 0 && (
-        <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6 md:p-8">
+        <div className="w-full max-w-6xl bg-white rounded-lg shadow-lg p-6 md:p-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
             <h2 className="text-xl font-semibold text-[#373995]">
               รายชื่อนักเรียน ({filteredStudents.length} คน)
@@ -274,49 +310,63 @@ const StudentManagement: React.FC = () => {
               <h3 className="text-lg font-semibold mb-3 text-[#373995]">
                 {editingStudent ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียนใหม่'}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <input
-                  type="text"
-                  placeholder="ชื่อ"
-                  value={newStudent.firstName}
-                  onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
-                <input
-                  type="text"
-                  placeholder="นามสกุล"
-                  value={newStudent.lastName}
-                  onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
-                <input
-                  type="text"
-                  placeholder="ชื่อเล่น"
-                  value={newStudent.nickname}
-                  onChange={(e) => setNewStudent({...newStudent, nickname: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
-                <input
-                  type="text"
-                  placeholder="ชั้น"
-                  value={newStudent.grade}
-                  onChange={(e) => setNewStudent({...newStudent, grade: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
-                <input
-                  type="text"
-                  placeholder="ห้อง"
-                  value={newStudent.section}
-                  onChange={(e) => setNewStudent({...newStudent, section: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
-                <input
-                  type="text"
-                  placeholder="URL รูปภาพ (ไม่บังคับ)"
-                  value={newStudent.avatar}
-                  onChange={(e) => setNewStudent({...newStudent, avatar: e.target.value})}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">คำนำหน้า *</label>
+                  <select
+                    value={newStudent.prefix}
+                    onChange={(e) => setNewStudent({...newStudent, prefix: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
+                  >
+                    <option value="">เลือกคำนำหน้า</option>
+                    {prefixOptions.map(prefix => (
+                      <option key={prefix} value={prefix}>{prefix}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อ *</label>
+                  <input
+                    type="text"
+                    placeholder="กรอกชื่อ"
+                    value={newStudent.firstName}
+                    onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">นามสกุล *</label>
+                  <input
+                    type="text"
+                    placeholder="กรอกนามสกุล"
+                    value={newStudent.lastName}
+                    onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ชั้นปี *</label>
+                  <select
+                    value={newStudent.gradeYear}
+                    onChange={(e) => setNewStudent({...newStudent, gradeYear: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
+                  >
+                    <option value="">เลือกชั้นปี</option>
+                    {gradeYearOptions.map(grade => (
+                      <option key={grade} value={grade}>{grade}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL รูปภาพ (ไม่บังคับ)</label>
+                  <input
+                    type="text"
+                    placeholder="กรอก URL รูปภาพหรือลิงก์ Google Drive"
+                    value={newStudent.avatar}
+                    onChange={(e) => setNewStudent({...newStudent, avatar: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#373995]"
+                  />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
@@ -329,7 +379,7 @@ const StudentManagement: React.FC = () => {
                   onClick={() => {
                     setIsAddingStudent(false);
                     setEditingStudent(null);
-                    setNewStudent({ firstName: "", lastName: "", nickname: "", grade: "", section: "", avatar: "" });
+                    setNewStudent({ prefix: "", firstName: "", lastName: "", gradeYear: "", avatar: "" });
                   }}
                   className="px-4 py-2 bg-gray-500 text-white rounded-md hover:opacity-90 transition-all"
                 >
@@ -345,10 +395,10 @@ const StudentManagement: React.FC = () => {
               <thead>
                 <tr className="bg-gray-50 border-b">
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ลำดับ</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ชื่อ-นามสกุล</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ชื่อเล่น</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ชั้น</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ห้อง</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">คำนำหน้า</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ชื่อ</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">นามสกุล</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ชั้นปี</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">รูปภาพ</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">จัดการ</th>
                 </tr>
@@ -359,18 +409,21 @@ const StudentManagement: React.FC = () => {
                   return (
                     <tr key={student.id} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm">{student.prefix}</td>
                       <td className="px-4 py-3 text-sm font-medium text-[#373995]">
-                        {student.firstName} {student.lastName}
+                        {student.firstName}
                       </td>
-                      <td className="px-4 py-3 text-sm">{student.nickname}</td>
-                      <td className="px-4 py-3 text-sm">{student.grade}</td>
-                      <td className="px-4 py-3 text-sm">{student.section}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-[#373995]">
+                        {student.lastName}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{student.gradeYear}</td>
                       <td className="px-4 py-3">
                         {student.avatar ? (
                           <img 
                             src={convertGoogleDriveUrl(student.avatar)} 
-                            alt={`${student.firstName} ${student.lastName}`}
-                            className="w-8 h-8 rounded-full object-cover"
+                            alt={`${student.prefix}${student.firstName} ${student.lastName}`}
+                            className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => handleImageClick(student.avatar!)}
                             onError={(e) => {
                               const target = e.currentTarget as HTMLImageElement;
                               target.style.display = 'none';
@@ -381,11 +434,12 @@ const StudentManagement: React.FC = () => {
                           />
                         ) : null}
                         <div 
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity"
                           style={{ 
                             backgroundColor: avatar.color,
                             display: student.avatar ? 'none' : 'flex'
                           }}
+                          onClick={() => student.avatar && handleImageClick(student.avatar)}
                         >
                           {avatar.initials}
                         </div>
